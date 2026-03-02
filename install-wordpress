@@ -1,0 +1,207 @@
+#!/bin/bash
+
+#Ce script permet l'installation ainsi que la configuration automatique d'un serveur LAMP.
+#Un DNS et un système de mailing sont aussi compris dans ce script.
+#=== IMPORTANT - Lors de l'installation, veillez à bien validez ces propositions : 
+#Serveur web à configurer automatiquement : Apache2 (avec la barre espace); 
+#Configurer la base de données avec dbconfig-common : oui.
+
+clear
+cd
+IP_MACHINE=$(hostname -I | awk '{print $1}')
+echo "===========================================================================
+------ Mise à jour du système et installation différents des paquets ------
+==========================================================================="
+sleep 3
+
+apt update && apt upgrade -y
+apt install unzip zip bind9 resolvconf bsd-mailx debconf-utils apache2 apache2-utils mariadb-server php phpmyadmin openssl exim4 dovecot-imapd roundcube roundcube-mysql -y
+
+echo "========================================================================
+------ Configuration de named.conf.local et db.wordpress.admin.lan------
+========================================================================"
+sleep 3
+
+cat > /etc/bind/named.conf.local <<EOF
+zone "wordpress.admin.lan" {
+  type master;
+  file "/var/lib/bind/db.wordpress.admin.lan";
+};
+EOF
+
+cat > /var/lib/bind/db.wordpress.admin.lan <<EOF
+$TTL	604800
+@	IN	SOA	ns.admin.lan.	root.wordpress.admin.lan. (
+				    1		; Serial
+			       604800		; Refresh
+			        86400		; Retry
+			      2419200		; Expire
+			       604800 ) 	; Negative Cache TTL
+;
+
+@	  IN	NS	ns.wordpress.admin.lan.
+@	  IN	MX	10 mail.wordpress.admin.lan.
+ns	  IN	A	$IP_MACHINE
+mail	  IN	A	$IP_MACHINE
+www	  IN 	A	$IP_MACHINE
+EOF
+
+systemctl restart bind9
+
+echo "======================================================================================
+------ Création et configuration de resolvconf et es fichiers Hosts en failover ------
+======================================================================================"
+sleep 3
+
+mkdir -p /etc/resolvconf/resolv.conf.d
+echo "nameserver 127.0.0.1" > /etc/resolvconf/resolv.conf.d/head
+
+sed -i '/wordpress.admin.lan/d' /etc/hosts
+echo "127.0.0.1 wordpress.admin.lan mail.wordpress.admin.lan" >> /etc/hosts
+
+echo "==========================================
+------ Installation du serveur LAMP ------
+=========================================="
+sleep 3
+
+echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2" | debconf-set-selections
+echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | debconf-set-selections
+echo "phpmyadmin phpmyadmin/mysql/app-pass password" | debconf-set-selections
+echo "phpmyadmin phpmyadmin/app-password-confirm password" | debconf-set-selections
+
+echo "==========================================
+------ Génération du certificat SSL ------
+=========================================="
+sleep 3
+
+cd /etc/apache2
+openssl req -x509 -nodes -days 365 -new -keyout apache.key -out apache.pem <<EOF
+FR
+Europe
+France
+DataCenter
+/
+wordpress.admin.lan
+admin@wordpress.admin.lan
+EOF
+
+echo
+
+echo "=======================================
+------ Installation de Wordpress ------
+======================================="
+sleep 3
+
+cd /tmp
+wget -q https://fr.wordpress.org/latest-fr_FR.zip
+unzip -q -o latest-fr_FR.zip
+rm latest-fr_FR.zip
+rm -rf /var/www/wordpress
+mv wordpress /var/www/
+/usr/sbin/a2enmod rewrite
+/usr/sbin/a2enmod ssl
+cd
+
+echo "===================================================
+------ Création d'un VirtualHost (port HTTP) ------
+==================================================="
+sleep 3
+
+echo "<VirtualHost *:80>
+	ServerName wordpress.admin.lan
+	DocumentRoot /var/www/wordpress
+	<Directory /var/www/wordpress>
+		AllowOverride All
+		Require all granted
+	</Directory>
+
+        RewriteEngine On
+        RewriteCond %{HTTPS} off
+        RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI}
+</VirtualHost>" > /etc/apache2/sites-available/wordpress.conf
+
+echo "====================================================
+------ Création d'un VirtualHost (port HTTPS) ------
+===================================================="
+sleep 3
+
+echo "<VirtualHost *:443>
+        ServerName wordpress.admin.lan
+        DocumentRoot /var/www/wordpress
+        <Directory /var/www/wordpress>
+                AllowOverride All
+		Require all granted
+        </Directory>
+
+	SSLEngine On
+        SSLCertificateFile      /etc/apache2/apache.pem
+        SSLCertificateKeyFile   /etc/apache2/apache.key
+</VirtualHost>" > /etc/apache2/sites-available/wordpress-ssl.conf
+
+/usr/sbin/a2ensite wordpress.conf
+/usr/sbin/a2ensite wordpress-ssl.conf
+systemctl reload apache2
+
+echo "======================================
+------ Configuration de Mariadb ------
+======================================"
+sleep 3
+
+mariadb <<EOF
+CREATE DATABASE IF NOT EXISTS wordpress;
+CREATE USER IF NOT EXISTS  wordpress@localhost IDENTIFIED BY "secret";
+GRANT ALL PRIVILEGES ON wordpress.* TO wordpress@localhost;
+FLUSH PRIVILEGES;
+EOF
+
+echo "=======================================================
+------ Peaufinage de la configuration du serveur ------
+======================================================="
+sleep 3
+
+cd /var/www/wordpress
+cp wp-config-sample.php wp-config.php
+
+sed -i 's/database_name_here/wordpress/g' wp-config.php
+sed -i 's/username_here/wordpress/g' wp-config.php
+sed -i 's/password_here/secret/g' wp-config.php
+
+chown -R www-data:www-data /var/www/wordpress
+chmod -R 755 /var/www/wordpress
+
+systemctl restart apache2
+
+echo "================================================
+------ Configuration d'Exim4 et Roundcube ------
+================================================"
+sleep 3
+
+echo "exim4-config exim4/dc_eximconfig_configtype select internet" | debconf-set-selections
+echo "exim4-config exim4/mailname string wordpress.admin.lan" | debconf-set-selections
+echo "exim4-config exim4/dc_local_interfaces string ''" | debconf-set-selections
+echo "exim4-config exim4/dc_other_hostnames string wordpress.admin.lan" | debconf-set-selections
+echo "exim4-config exim4/dc_relay_nets string 127.0.0.0/8;$IP_MACHINE/24" | debconf-set-selections
+echo "Configuration de exim4.conf.localmacros"
+
+echo "ROUTER_DNSLOOKUP_IGNORE_TARGET_HOSTS = 1" > /etc/exim4/exim4.conf.localmacros
+systemctl restart exim4
+
+echo "roundcube roundcube/dbconfig-install boolean true" | debconf-set-selections
+echo "roundcube roundcube/database-type select mysql" | debconf-set-selections
+echo "roundcube roundcube/mysql/app-pass password" | debconf-set-selections
+echo "roundcube roundcube/app-password-confirm password" | debconf-set-selections
+
+sed -i 's|# *Alias /roundcube|Alias /roundcube|g' /etc/apache2/conf-available/roundcube.conf
+a2enconf roundcube
+systemctl restart apache2
+sed -i "s|^\$config\['smtp_host'\].*|\$config['smtp_host'] = 'localhost:25';|" /etc/roundcube/config.inc.php
+sed -i "s|^\$config\['smtp_user'\].*|\$config['smtp_user'] = '';|" /etc/roundcube/config.inc.php
+sed -i "s|^\$config\['smtp_pass'\].*|\$config['smtp_pass'] = '';|" /etc/roundcube/config.inc.php
+
+echo "===================================
+------ INSTALLATION TERMINÉE ------
+===================================
+phpmyadmin : https://NOM_DE_VOTRE_MACHINE.lan/phpmyadmin (wordpress / secret)
+Wordpress : https://NOM_DE_VOTRE_MACHINE.lan
+Roundcube : https://NOM_DE_VOTRE_MACHINE.lan/roundcube
+Identifiants Mail : $(logname) / mot_de_passe-de-votre-machine"
