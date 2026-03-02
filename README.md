@@ -22,6 +22,6 @@ Ce script Bash permet d’installer et de configurer automatiquement un serveur 
 - Exim4 et Roundcube pour la messagerie locale.
 
 ## À la fin de l’exécution, vous pouvez accéder aux services via :
-phpmyadmin : https://NOM_DE_VOTRE_MACHINE.lan
-Wordpress : https://NOM_DE_VOTRE_MACHINE.lan/phpmyadmin
-Roundcube : https://NOM_DE_VOTRE_MACHINE.lan/roundcube
+- phpmyadmin : https://NOM_DE_VOTRE_MACHINE.lan
+- Wordpress : https://NOM_DE_VOTRE_MACHINE.lan/phpmyadmin
+- Roundcube : https://NOM_DE_VOTRE_MACHINE.lan/roundcube
