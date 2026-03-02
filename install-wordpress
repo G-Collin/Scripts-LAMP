@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#Ce script permet l'installation ainsi que la configuration automatique d'un serveur LAMP.
-#Un DNS et un système de mailing sont aussi compris dans ce script.
-#=== IMPORTANT - Lors de l'installation, veillez à bien validez ces propositions : 
-#Serveur web à configurer automatiquement : Apache2 (avec la barre espace); 
-#Configurer la base de données avec dbconfig-common : oui.
+# Ce script permet l'installation ainsi que la configuration automatique d'un serveur LAMP.
+# Un DNS et un système de mailing sont aussi compris dans ce script.
+# === IMPORTANT - Lors de l'installation, veillez à bien validez ces propositions : 
+# Serveur web à configurer automatiquement : Apache2 (avec la barre espace); 
+# Configurer la base de données avec dbconfig-common : oui.
 
 clear
 cd
