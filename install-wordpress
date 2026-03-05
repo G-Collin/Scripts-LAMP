@@ -85,8 +85,6 @@ wordpress.admin.lan
 admin@wordpress.admin.lan
 EOF
 
-echo
-
 echo "=======================================
 ------ Installation de Wordpress ------
 ======================================="
