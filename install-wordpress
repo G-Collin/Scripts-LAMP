@@ -181,7 +181,6 @@ echo "exim4-config exim4/mailname string wordpress.admin.lan" | debconf-set-sele
 echo "exim4-config exim4/dc_local_interfaces string ''" | debconf-set-selections
 echo "exim4-config exim4/dc_other_hostnames string wordpress.admin.lan" | debconf-set-selections
 echo "exim4-config exim4/dc_relay_nets string 127.0.0.0/8;$IP_MACHINE/24" | debconf-set-selections
-echo "Configuration de exim4.conf.localmacros"
 
 echo "ROUTER_DNSLOOKUP_IGNORE_TARGET_HOSTS = 1" > /etc/exim4/exim4.conf.localmacros
 systemctl restart exim4
