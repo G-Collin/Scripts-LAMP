@@ -201,7 +201,7 @@ sed -i "s|^\$config\['smtp_pass'\].*|\$config['smtp_pass'] = '';|" /etc/roundcub
 echo "===================================
 ------ INSTALLATION TERMINÉE ------
 ===================================
-phpmyadmin : https://NOM_DE_VOTRE_MACHINE.lan/phpmyadmin (wordpress / secret)
-Wordpress : https://NOM_DE_VOTRE_MACHINE.lan
-Roundcube : https://NOM_DE_VOTRE_MACHINE.lan/roundcube
+phpmyadmin : https://NOM_DE_VOTRE_MACHINE/phpmyadmin (wordpress / secret)
+Wordpress : https://NOM_DE_VOTRE_MACHINE
+Roundcube : https://NOM_DE_VOTRE_MACHINE/roundcube
 Identifiants Mail : $(logname) / mot_de_passe-de-votre-machine"
